@@ -24,6 +24,7 @@ typedef struct settings_s {
     int benchtime;
     bool force;
     bool forceReload;
+    char **urls;
 }settings_t;
 
 #endif /* _SETTINGS_H_ */
