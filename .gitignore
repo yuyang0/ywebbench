@@ -1,2 +1,7 @@
 *.o
 *.bak
+*.d
+*.d.*
+.cproject
+.project
+/ywebbench

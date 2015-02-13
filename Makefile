@@ -1,40 +1,50 @@
-CFLAGS?=	-Wall -ggdb -W -O
-CC?=		gcc
-LIBS?=
-LDFLAGS?=
-PREFIX?=	/usr/local
-VERSION=1.5
-TMPDIR=/tmp/webbench-$(VERSION)
+# 如果是生产环境请把DEBUG设为0
+DEBUG ?= 1
 
-all:   webbench tags
+CC := gcc
+AR := ar
+RANLIB := ranlib
 
-tags:  *.c
-	-ctags *.c
+ifeq ($(DEBUG), 1)
+    CFLAGS := -g -Wall -std=gnu99 -DDEBUG
+else
+    CFLAGS := -O2 -std=gnu99 -DNDEBUG
+endif
 
-install: webbench
-	install -s webbench $(DESTDIR)$(PREFIX)/bin	
-	install -m 644 webbench.1 $(DESTDIR)$(PREFIX)/man/man1	
-	install -d $(DESTDIR)$(PREFIX)/share/doc/webbench
-	install -m 644 debian/copyright $(DESTDIR)$(PREFIX)/share/doc/webbench
-	install -m 644 debian/changelog $(DESTDIR)$(PREFIX)/share/doc/webbench
+EXE_FILES := ywebbench
 
-webbench: webbench.o Makefile
-	$(CC) $(CFLAGS) $(LDFLAGS) -o webbench webbench.o $(LIBS) 
+OBJS := conf.o url.o main.o util.o
+SOURCES := $(OBJS:.o=.c)
 
+all:  $(EXE_FILES)
+
+ywebbench: $(OBJS)
+	$(CC) -o $@ $^  -lm
+%.o:%.c
+	@echo "$(CC) -c $(CFLAGS) -o $@ $<"
+	@$(CC) -fPIC -shared -c $(CFLAGS) $(CPPFLAGS) $< -o $@ $(OPENCL_INC_PATH) $(INC_PATH)
+
+#自动处理头文件依赖
+#SOURCES为所有的源文件列表
+%.d: %.c
+	@set -e; rm -f $@; \
+	$(CC) -MM $(CPPFLAGS) $< > $@.$$$$; \
+	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' < $@.$$$$ > $@; \
+	rm -f $@.$$$$
+# ignore the warn message "XXX.d: No such file or directory"
+-include $(SOURCES:.c=.d)
+
+install: all
+	@if [ -d $(INSTDIR) ]; \
+	then \
+	cp myapp $(INSTDIR);\
+	chmod a+x $(INSTDIR)/$(EXE_FILE);\
+	chmod og-w $(INSTDIR)/$(EXE_FILE);\
+	echo “Installed in $(INSTDIR)“;\
+	else \
+	echo “Sorry, $(INSTDIR) does not exist”;\
+	fi
+
+.PHONY: clean
 clean:
-	-rm -f *.o webbench *~ core *.core tags
-	
-tar:   clean
-	-debian/rules clean
-	rm -rf $(TMPDIR)
-	install -d $(TMPDIR)
-	cp -p Makefile webbench.c socket.c webbench.1 $(TMPDIR)
-	install -d $(TMPDIR)/debian
-	-cp -p debian/* $(TMPDIR)/debian
-	ln -sf debian/copyright $(TMPDIR)/COPYRIGHT
-	ln -sf debian/changelog $(TMPDIR)/ChangeLog
-	-cd $(TMPDIR) && cd .. && tar cozf webbench-$(VERSION).tar.gz webbench-$(VERSION)
-
-webbench.o:	webbench.c socket.c Makefile
-
-.PHONY: clean install all tar
+	-rm -f *.o $(EXE_FILES) *.d *.d.* *.bin *.out new
